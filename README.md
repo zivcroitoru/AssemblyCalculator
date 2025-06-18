@@ -2,7 +2,6 @@
 
 Calculator programmed in Assembly Architecture
 **Computer Organization and Programming Course**
-*Shankar College of Design & Engineering*
 
 ---
 
