@@ -1,0 +1,992 @@
+MAIN,           LDA     BOOT_MESSAGE    //
+                BSA     Print           // Printf("End Input: (Enter) | Exit: (X or x) | Op: (+, -, *, /"))
+START_PROG,     CLA                     //
+                STA     NUM1            //
+                STA     NUM2            //
+                STA     Operator        //
+                STA     FLAG_RNG        // Initialize global paramaters to 0 (NUM1, NUM2, OPERATOR, FLAG_RNG) 
+                LDA     PROMPT_Arrow    // Printf("->");
+                BSA     Print           //
+Int_NUM1,       BSA     ATOI            // ATOI(Scanf("%d",&NUM1))
+                STA     NUM1            // NUM2 = ATOI();
+OP_INPUT,       LDA     ATOI_DIGIT      //
+                STA     OPERATOR        //
+Int_NUM2,       BSA     ATOI            // ATOI(Scanf("%d",&NUM2))
+                STA     NUM2            // NUM2 = ATOI();
+
+                                        // SWITCH (OPERATOR):
+
+ADDITION_CHK,   LDA     OPERATOR        // CASE '+': ADD()
+                ADD     ASCII_PLUS      //
+                SZA                     //
+                BUN     SUB_CHK         // 
+                BSA     ADD_FUNC        //  
+                LDA     FLAG_RNG        //
+                SZA                     // if(Flag_RNG != 0)
+                BUN     START_PROG      // THEN return (range error)
+                LDA     RESULT          // 
+                BSA     Display_NUM     // ELSE return result
+                BUN     START_PROG      //
+
+SUB_CHK,        LDA     OPERATOR        // CASE '-': SUBTRACT()
+                ADD     ASCII_MINUS     //
+                SZA                     //
+                BUN     MULTI_CHK       //
+                BSA     SUBTRACT_FUNC   //
+                BSA     Display_NUM     // RESULT = NUM1 - NUM2
+                BUN     START_PROG      //
+
+MULTI_CHK,      LDA     OPERATOR        // CASE '*': MULTI()
+                ADD     ASCII_MULT      //
+                SZA                     //
+                BUN     DIV_CHK         //
+                BSA     MULTI           //
+                BSA     Display_NUM     // RESULT = NUM1 * NUM2
+                BUN     START_PROG      //
+
+DIV_CHK,        LDA     OPERATOR        // CASE '/': DIV()
+                ADD     ASCII_DIV       //
+                SZA                     //
+                BUN     ERR_INPUT       //
+                BSA     Division        //
+                BSA     DIV_RES_FUNC    //
+                BUN     START_PROG      //
+
+// -----------------HANDLE_EXIT_AND_ERRORS------------------
+
+
+EXIT_SMBL,      LDA     ATOI_DIGIT      //
+                ADD     EXIT            // Check for exit command
+                SZA                     // If (OP == X || OP == x)
+                BUN     CHECK_EXT2      //  THEN
+                BUN     END_PROGRAM     //  END_PROGRAM
+
+
+CHECK_EXT2,     LDA     ATOI_DIGIT      //
+                ADD     EXIT2           //
+                SZA                     //
+                BUN     ERR_INPUT       //  ELSE
+                BUN     END_PROGRAM     //
+
+               
+     
+ERR_INPUT,      LDA     PtrERR_INPUT    //
+                BSA     Print           //      Printf("Err: Invalid Input!\n")
+                CLA                     //
+                STA     FLAG_DIV        //
+                STA     FLAG_MULT       //      FLAG_DIV,FLAG_MULT = 0
+                BUN     START_PROG      //      
+
+
+ERR_DIV,        LDA     PtrERR_DIV      // Printf("Error: division by zero!")
+                BSA     Print           //
+                BUN     START_PROG      //
+
+
+ERR_RANGE,      LDA     PtrERR_RANGE    //
+                BSA     Print           //
+                BUN     START_PROG      //
+
+
+
+END_PROGRAM,    LDA     PtrOFF_START    // Print "System OFF"
+                BSA     Print           //
+                HLT                     // END OF PROGRAM
+
+
+//---------------------------------MAIN DATA-----------------------------------//
+Operator,       HEX     0               //
+EXIT,           HEX     -58             //
+EXIT2,          HEX     -78             //
+NUM1,           DEC     0               //
+NUM2,           DEC     0               //
+RESULT,         HEX     0               //
+COUNT,          HEX     0               //
+ASCII_CR,       HEX     -D              //
+ASCII_MINUS,    DEC     -45             //
+ASCII_PLUS,     HEX     -2B             //
+ASCII_MULT,     HEX     -2A             //
+ASCII_DIV,      HEX     -2F             //
+pointer,        HEX     0               //
+FLAG_RNG,       HEX     0               //
+
+
+
+
+//---------------------------------SUBROUTINES----------------------------------//
+
+//********************* ADD_FUNC ***********************
+// PURPOSE: Perform the addition arithmetic operation and check if the result falls within the valid range.
+// GLOBAL PARAMETERS:
+// - RESULT: the sum of the addition.
+// - NUM1 : Augend: The number to which another number is added.
+// - NUM2 : Addend: The number that is added to the augend.
+// INPUT PARAMATERS : int NUM1, int NUM2
+// CALLED BY: ADDITION_CHK
+// SIDE EFFECTS: Modifies RESULT during processing, restarts the program if the result is out of range.
+// CALLS : FINDMSB, CHECK_MSB
+
+ADD_FUNC,       HEX     0
+                LDA     NUM1            // ADD()
+                ADD     NUM2            //
+                STA     RESULT          // RESULT = NUM1 + NUM2
+                BSA     FIND_MSB        // Finds the MSB of NUM1, NUM2 and the RESULT's
+                BSA     CHECK_MSB       // Checks if the result is in the range according to the MSB
+                SZA                     // if(Flag_RNG == 0)
+                BUN     ADD_FUNC I      // return (range error)
+                LDA     RESULT          //
+                BUN     ADD_FUNC I      // return result     
+
+//********************* SUBTRACT_FUNC ***********************  
+// PURPOSE: Perform subtraction using two's Complement
+// GLOBAL PARAMETERS:
+// - NUM1 : Minuend: The number from which another number is subtracted.
+// - NUM2 : Subtrahend: The number that is subtracted from the minuend.
+// INPUT PARAMATERS : int NUM1, int NUM2
+// CALLED BY: ADDITION_CHK
+// SIDE EFFECTS: Modifies RESULT during processing, restarts the program if the result is out of range.
+// CALLS : FINDMSB, CHECK_MSB                               
+SUBTRACT_FUNC,  HEX     0
+                LDA     NUM2            // SUBTRACT()
+                CMA                     //
+                INC                     // using 2's Complement
+                ADD     NUM1            // NUM1 + (-NUM2) 
+                BUN     SUBTRACT_FUNC I //        
+
+// **************** Function int MULTI (fast) ****************
+// PURPOSE: Perform efficient multiplication using bitwise operations.
+// GLOBAL PARAMETERS: NUM1, NUM2, RESULT
+// INPUT PARAMETERS:
+// - int NUM1 : Multiplicand
+// - int NUM2 : Multiplier
+// OUTPUT PARAMETERS:
+// - int RESULT: Product
+// CALLED BY: GOTO_MULTI_FUN
+
+
+MULTI,          HEX     0               //
+                CLA                     //
+                STA     RESULT          // RESULT = 0;
+                LDA     initCTR         //
+                STA     temp_ctr        // temp_ctr = initCTR;
+LOOP_m,         LDA     NUM2            //
+                CIR                     //
+                STA     NUM2            // NUM2 = Rotate right and transfer bit to E;
+                SZE                     // if(E == 0)
+                BUN     ONE_BIT         // THEN GOTO ONE_BIT
+                BUN     ZRO_BIT         // ELSE GOTO ZRO_BIT
+ONE_BIT,        LDA     NUM1            //
+                ADD     RESULT          //
+                STA     RESULT          // RESULT += NUM1 + RESULT;
+                CLE                     //
+ZRO_BIT,        LDA     NUM1            //
+                CIL                     //
+                STA     NUM1            // NUM1 = Rotate right and transfer bit to E;
+                ISZ     temp_ctr        // if(temp_ctr != 0) temp_ctr++;
+                BUN     LOOP_m          // LOOP_m
+WHILE,          LDA     temp_ctr        //
+                SZA                     // if(temp_ctr != 0)
+                BUN     DO              // THEN DO
+                BUN     OD              // ELSE OD
+DO,             LDA     RESULT          //
+                BUN     WHILE           // GOTO WHILE
+OD,             LDA     RESULT          //
+                BUN     MULTI I         // Return
+
+// Fast multi data
+initCTR,        DEC     -16             // 
+temp_ctr,       DEC     0               // 
+                
+// **************** Function int Division ****************
+// PURPOSE: Perform integer division, using absolute values of NUM1 and NUM2
+// GLOBAL PARAMETERS: NUM1, NUM2, RESULT, COUNT
+// INPUT PARAMETERS:
+// - NUM1: int (Dividend)
+// - NUM2: int (Divisor)
+// OUTPUT PARAMETERS:
+// - RESULT: int (Quotient)
+// - REMAINDER: int (ABSNUM1)
+// CALLED BY: GOTO_DIV_FUNC
+
+Division,       HEX     0               //
+                CLA                     //
+                STA     AbsNum1         //
+                STA     AbsNum2         // set paramaters to 0 (AbsNum1,AbsNum2)
+                LDA     NUM1            //
+                SNA                     // if(NUM1 > 0 )
+                BUN     NextNum         //      THEN NEGATE_NUM1
+                BUN     NegateNum1      //      ELSE 
+NextNum,        STA     AbsNum1         //              AbsNum1 = -AbsNum1 || NUM1
+                LDA     NUM2            // 
+                SNA                    	// if(NUM2 < 0)
+                BUN     CheckZero       //      THEN NegateNum2
+                BUN     NegateNum2      //      ELSE CHECK_ZERO(AbsNum2)
+checkZero,      STA     AbsNum2         //      AbsNum2 = NUM2
+                SZA                     //      if(AbsNum2 == 0)
+                BUN     normalDiv      	//              THEN return ERR_DIV
+                BUN     ERR_DIV         //              ELSE continue with normal division
+NegateNum1,     LDA     NUM1            // 
+                CMA                     // 
+                INC                     //
+                STA     AbsNum1         // AbsNum1 = -NUM1
+                BUN     NextNum         // 
+NegateNum2,     LDA     NUM2            // 
+                CMA                     // 
+                INC                     // 
+                ADD     AbsNum2         // 
+                STA     AbsNum2         // AbsNum2 = -NUM2+AbsNum2
+                BUN     checkZero       // CHECK_ZERO(AbsNum2)
+normalDiv,      CMA                    	// 
+                INC                    	// 
+                STA     AbsNum2         // AbsNum2 = AbsNum2
+                CLA                    	// 
+                STA     RESULT          // RESULT = 0           
+Loop,           LDA     AbsNum2         // 
+                ADD     AbsNum1         // 
+                SNA                    	// if((AbsNum2+AbsNum1) < 0)
+                BUN     Contine         //      THEN GOTO Contine
+                BUN     ReturnDig      	//      ELSE ReturnDig
+Contine,        LDA     AbsNum2         // 
+                ADD     Absnum1         // 
+                STA     Absnum1         // AbsNum1 = AbsNum2 + AbsNum1
+                ISZ     RESULT          // if(RESULT != 0 ) RESULT++
+                BUN     Loop            // Branch to Loop
+ReturnDig,      BUN     Division I      // Return
+
+// Division data
+AbsNum1,        DEC     0               // 
+AbsNum2,        DEC     0               // 
+
+//********************* DIV_RES_FUNC *********************** 
+// PURPOSE: Assign the correct sign to the result from the division function according to the signs of the input numbers, and print the result with the remainder
+// GLOBAL PARAMETERS: NUM1, NUM2, AbsNum1, AbsNum2, RESULT
+// INPUT PARAMETERS:
+// - NUM1: int (Dividend)
+// - NUM2: int (Divisor)
+// OUTPUT PARAMETERS:
+// - RESULT: int (Quotient)
+// - REMAINDER: int (ABSNUM1)
+// CALLED BY: DIV_CHK
+// CALLS : DISPLAY_NUM, PRINT
+// SIDE EFFECTS : Alters Result (global paramater)
+
+DIV_RES_FUNC,   HEX     0                
+                LDA     NUM1            //
+                SPA                     // if(NUM1 > 0 && NUM2 > 0)
+                BUN     NegateResNum1   //      THEN
+CHK_NEG_2,      LDA     NUM2            //      
+                SPA                     //  
+                BUN     NegateResNum2   //  
+PrintPosRes,    LDA     RESULT          //
+                BSA     Display_NUM     //      Printf("%d",division_RESULT)
+                LDA     REMAIND_START   //
+                BSA     Print           //      Printf("Rem: ")
+                LDA     AbsNum1         //
+                BSA     Display_NUM     //      Printf(%d,remainder);
+                BUN     START_PROG      //
+NegateResNum1,  LDA     NUM2            //  
+                SPA                     // ELSE if(NUM2 > 0 && NUM1 < 0)
+                BUN     PrintPosRes     //      THEN
+                LDA     Result          //
+                CMA                     //
+                INC                     //
+                BSA     Display_NUM     //      Printf("%d",division_RESULT)
+                LDA     REMAIND_START   //
+                BSA     Print           //      Printf("Rem: ")
+                LDA     AbsNum1         //
+                BSA     Display_NUM     //      Printf(%d,remainder);
+                BUN     START_PROG      //
+NegateResNum2,  LDA     Result          //      ELSE
+                CMA                     //  
+                INC                     //
+                BSA     Display_NUM     //      Printf("%d",division_RESULT)
+                LDA     REMAIND_START   //  
+                BSA     Print           //      Printf("Rem: ")
+                LDA     AbsNum1         //  
+                BSA     Display_NUM     //      Printf(%d,remainder);
+                BUN     DIV_RES_FUNC I  // return 
+
+// **************** Function int Display_NUM() ****************
+// PURPOSE: Print the number stored in RESULT
+// GLOBAL PARAMETERS:
+// - MINUSONE
+// - RESULT: The number to be printed 
+// - pointer: Used to point to the current digit's position in the digit array
+// CALLED BY: NegateResNum1, NegateResNum2, PrintPosRes, GOTO_MULTI_FUN, SUBTRACT, CHECK_MSB
+// SIDE EFFECTS: Modifies RESULT during processing, alters global parameters (pointer, Temp)
+
+
+
+
+Display_NUM,    HEX     E22             //
+                STA     RESULT          //
+                LDA     RESULT_launch   //
+                BSA     Print           // Print "= "
+                LDA     Ndigit_cap_st   //
+                STA     pointer         // Store in pointer
+                LDA     RESULT          //
+                SZA                     //
+                BUN     Verify_sign     // Branch to Verify_sign
+                ADD     ASCII_OFFSET    // Add ASCII offset
+
+                LDA     RESULT          //
+                SZA                     //
+                BUN     START_PROG      //
+                LDA     AbsNum1         //
+                STA     NUM1            //
+
+Verify_sign,    SNA                     // If(RESULT > 0)
+                BUN     POS_value       //      THEN 
+NEG_value,      LDA     RESULT          //      
+                CMA                     //
+                INC                     //
+                STA     Temp            //          Temp = -NUM
+                LDA     Minus_symbol    //
+OUT_MINUS,      SKO                     // 
+                BUN     OUT_MINUS       //
+                OUT                     //          Printf("-")
+                BUN     FLIP            //          go to FLIP
+
+
+POS_value,      LDA     RESULT          //      ELSE 
+                STA     Temp            //          Temp = NUMBER
+FLIP,           LDA     FOUR            //          Load 4
+                STA     J               //          J = 4
+
+
+FORloop,        LDA     J               //          FOR (J = 4; J > 0; J--)
+                SPA                     //
+                BUN     END_FOR         //
+                CLA                     //
+                STA     INDEX_DIGIT     // INDEX_DIGIT = 0
+
+
+DOloop,         LDA     pointer I       // WHILE (Temp - Ndigit_cap_st[pointer] > 0)
+                ADD     Temp            // DO
+                SNA                     //      
+                BUN     GO_ON_LOOP      //
+                BUN     OUTPUT_DIGIT    //
+
+
+GO_ON_LOOP,     STA     Temp            // Temp = Temp - Ndigit_cap_st[pointer]
+                ISZ     INDEX_DIGIT     // INDEX_DIGIT++
+                BUN     DOloop          //
+
+
+OUTPUT_DIGIT,   LDA     INDEX_DIGIT     //
+                SPA                     // If currentDigit > 0
+                BUN     FLAG_verify     //
+                BUN     PRINT_approved  //
+FLAG_verify,    LDA     FLAG            //
+                SPA                     // If(Flag > 0)
+                BUN     pointer+1       //      THEN
+PRINT_approved, LDA     INDEX_DIGIT     //
+                ADD     ASCII_OFFSET    //
+OUT_INDEX,      SKO                     //
+                BUN     OUT_INDEX       //
+                OUT                     //      Printf(INDEX_DIGIT);
+                LDA     FLAG            //
+                INC                     //
+                STA     FLAG            //  ELSE
+pointer+1,      ISZ     pointer         //      pointer++
+                LDA     J               //
+                ADD     MINUSONE        //      J--
+                STA     J               //
+                BUN     FORloop         //
+END_FOR,        LDA     Temp            //
+                ADD     ASCII_OFFSET    //
+OUT_TEMP,       SKO                     //
+                BUN     OUT_TEMP        //
+                OUT                     //      Printf("%d",Temp)
+END1,           CLA                     //
+                STA     pointer         //      pointer = 0;
+                STA     FLAG            //      FLAG = 0;
+                BUN     Display_NUM I   // return
+
+
+//Display_NUM data
+Minus_symbol,   HEX     2D              //
+INDEX_DIGIT,    DEC     0               //
+J,              HEX     0               //
+Temp,           HEX     0               //
+FLAG,           HEX     0               //
+FOUR,           DEC     4               //
+ASCII_OFFSET,   HEX     30              //
+
+
+
+// **************** Function int ATOI ****************
+// PURPOSE: Convert ASCII input to an integer, validate its format and range, track minus signs, and store the result in ATOI_SUM.
+// Global PARAMETERS: Operator,NUM1,NUM2,RESULT, ASCII_MINUS, ASCII_PLUS, ASCII_MULT, ASCII_DIV, ATOI_DIGIT, MINUSONE, PLUSONE
+// INPUT PARAMETERS: ATOI_DIGIT (input by the user)
+// OUTPUT PARAMETERS: ATOI_SUM (Converted integer value)
+// CALLED BY: INT_NUM1, INT_NUM2
+// CALLS: MUL10
+ATOI,           HEX     0               // WHILE_LOOP1
+                CLA                     // DO1
+                STA     ATOI_SUM        //
+                STA     ATOI_DIGIT      //
+                STA     MINUS_COUNT     // SET PARAMETERS TO 0 (ATOI_SUM, ATOI_DIGIT, MINUS_COUNT)
+ATOI_INPUT,     SKI                     //
+                BUN     ATOI_INPUT      //
+                INP                     //
+                STA     ATOI_DIGIT      // SCANF("%D",&ATOI_DIGIT)
+OUT_DIGIT,      SKO                     //
+                BUN     OUT_DIGIT       //
+                OUT                     // printf(ATOI_DIGIT);
+                BSA     CHK_SYMBOLS     // Check for special symbols
+                ADD     ASCII_PLUS      //
+                SZA                     // if(ATOI_DIGIT == '+')
+                BUN     DIV_DUP1        //      THEN
+                BUN     FIN             //          OD1
+DIV_DUP1,       LDA     ATOI_DIGIT      //
+                ADD     ASCII_DIV       //
+                SZA                     // else if(ATOI_DIGIT == '/')
+                BUN     MULT_DUP1       //      THEN
+                INC                     //
+                STA     FLAG_DIV        //              FLAG_DIV++
+                ADD     MINUSONE        //              
+                SZA                     //              if(FLAG_DIV == 1)
+                BUN     MULT_DUP1       //                  THEN
+                BUN     ERR_INPUT       //                      return err_input
+MULT_DUP1,      LDA     ATOI_DIGIT      //    
+                ADD     ASCII_MULT      //
+                SZA                     // else if(ATOI_DIGIT == '*')    
+                BUN     MINUS_DUP       //     THEN
+                INC                     //
+                STA     FLAG_MULT       //              FLAG_MULT++
+                ADD     MINUSONE        //
+                SZA                     //              if(FLAG_MULT == 1)
+                BUN     MINUS_DUP       //                  THEN
+                BUN     ERR_INPUT       //                      return err_input
+
+MINUS_DUP,      LDA     ATOI_DIGIT      //
+                ADD     ASCII_MINUS     //
+                SZA                     // else if(ATOI_DIGIT == '-')
+                BUN     ATOI_CHECK_0    //      THEN
+                ISZ     MINUS_COUNT     //              if(MINUS_COUNT != 0) MINUS_COUNT++
+                BUN     ATOI_INPUT      //                  GOTO ATOI_INPUT
+                                        //  OD1
+
+
+ATOI_IN_LOOP,   SKI                     // WHILE_LOOP2
+                BUN     ATOI_IN_LOOP    // DO2
+                INP                     //
+                STA     ATOI_DIGIT      // SCANF("%D",&ATOI_DIGIT);
+OUT_DIGIT2,     SKO                     //
+                BUN     OUT_DIGIT2      //
+                OUT                     // printf(ATOI_DIGIT);
+                BSA     CHK_SYMBOLS     //
+
+                ADD     ASCII_PLUS      //
+                SZA                     // if(ATOI_DIGIT == '+')
+                BUN     DIV_DUP         //  THEN
+                BUN     FIN             //      OD2
+DIV_DUP,        LDA     ATOI_DIGIT      //    
+                ADD     ASCII_DIV       //
+                SZA                     // else if(ATOI_DIGIT == '/')
+                BUN     MULT_DUP        //  THEN
+
+                LDA     FLAG_DIV        //        
+                ADD     PLUSONE         //    
+                STA     FLAG_DIV        //     FLAG_DIV++;
+                LDA     ATOI_DIGIT      //    
+                ADD     ASCII_MULT      //
+                SZA                     // if(FLAG_MULT == 1)
+                BUN     ATOI_CHECK_0    //  THEN
+                BUN     ERR_INPUT       //     return err_input;
+MULT_DUP,       LDA     ATOI_DIGIT      //
+                ADD     ASCII_MULT      //
+                SZA                     // else if(ATOI_DIGIT == '*')
+                BUN     ATOI_CHECK_0    //  THEN
+                LDA     FLAG_MULT       //        
+                ADD     PLUSONE         //
+                STA     FLAG_MULT       //     FLAG_MULT++;
+                LDA     ATOI_DIGIT      //
+                ADD     ASCII_DIV       //    
+                SZA                     //     if(FLAG_DIV == 1)
+                BUN     ATOI_CHECK_0    //          THEN
+                BUN     ERR_INPUT       //              return err_input;
+ATOI_CHECK_0,   LDA     ATOI_DIGIT      //
+                ADD     ASCII_0         //
+                SNA                     // else if(ATOI_DIGIT < 0)
+                BUN     ATOI_CHECK_9    //   THEN
+                LDA     ATOI_SUM        //          SUM += ATOI_DIGIT
+                BUN     FIN             //        
+ATOI_CHECK_9,   LDA     ATOI_DIGIT      //        
+                ADD     ASCII_9         //
+                SPA                     //  IF ELSE(ATOI_DIGIT > 9)
+                BUN     ATOI_LOOP       //      THEN
+                BUN     EXIT_SMBL       //          return CHECK(EXIT_SMBL);
+
+
+ATOI_LOOP,      LDA     ATOI_SUM        //
+                BSA     MUL10           // MUL10(SUM)
+                ADD     ATOI_DIGIT      //
+                ADD     ASCII_0         //
+                STA     ATOI_SUM        // SUM += ASCII_0 + ATOI_DIGIT;
+                ADD     UNDERFLOW       //
+                SPA                     // IF(SUM > UNDERFLOW)
+                BUN     ATOI_IN_LOOP    //  THEN OD2
+                BUN     ERR_RANGE       //  ELSE return ERR_RANGE;
+
+
+ATOI_CHECK_OP,  LDA     ATOI_DIGIT      //
+                ADD     ASCII_PLUS      //
+                STA     OPERATOR        // OPERATOR = ATOI_DIGIT + ASCII_PLUS;
+                SZA                     // if(OPERATOR != 0)
+                BUN     ATOI_CHECK_0    //      THEN GOTO ATOI_CHECK_0;
+                BUN     ADDITION_CHK    //      ELSE GOTO POS_CHK;
+
+
+FIN,            LDA     MINUS_COUNT     // else
+                AND     PLUSONE         //
+                STA     MINUS_COUNT     // MINUS_COUNT++;
+                SZA                     // if(MINUS_COUNT == 0)
+                BUN     NEGATE_NUM      //      THEN
+                LDA     ATOI_SUM        //
+                BUN     ATOI I          //          RETURN ATOI I
+NEGATE_NUM,     LDA     ATOI_SUM        //      ELSE
+                CMA                     //
+                INC                     //
+                STA     ATOI_SUM        //          ATOI_SUM = -ATOI_SUM
+                LDA     ATOI_SUM        //
+                BUN     ATOI I          //          RETURN ATOI I
+
+
+// ATOI DATA
+FLAG_DIV,       DEC     0               //
+FLAG_MULT,      DEC     0               //
+MINUS_COUNT,    DEC     0               //
+MINUS_FLAG,     DEC     0               //
+ASCII_0,        HEX     -30             //
+ASCII_9,        HEX     -39             //
+ATOI_SUM,       DEC     0               //
+ATOI_DIGIT,     DEC     0               //
+PLUSONE,        DEC     1               //
+MINUSONE,       DEC     -1              //
+UNDERFLOW,      DEC     -32768          //
+
+
+
+//************************** CHK_SYMBOLS FUNCTION *****************
+// PURPOSE: Check if the input is a non-numeric, non-operator special character and report an error for invalid input.
+// Global PARAMETERS: ATOI_DIGIT
+// INPUT PARAMETERS: ATOI_DIGIT is stored in TEMP_SYM
+// CALLED BY: ATOI
+
+CHK_SYMBOLS,    HEX    0
+                STA     TEMP_SYM
+CHK_!,         	LDA    	TEMP_SYM        //  CHECK IF(ATOI_DIGIT == ! || " || # || $ || % || & || ( || ) || , || .)
+               	ADD     ASCII_!		// 	THEN
+               	SZA                     //  return (err_input)
+                BUN    	CHK_"           //
+                BUN    	ERR_INPUT       //
+
+CHK_",    	LDA    	TEMP_SYM	//
+               	ADD     ASCII_"         //
+               	SZA                     //
+                BUN    	CHK_#           //
+                BUN    	ERR_INPUT       //
+ 
+CHK_#,    	LDA    	TEMP_SYM     	//
+               	ADD     ASCII_#         //
+               	SZA                     //
+                BUN    	CHK_$           //
+                BUN    	ERR_INPUT       //
+
+CHK_$,    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_$         //
+               	SZA                     //
+                BUN    	CHK_%           //
+                BUN    	ERR_INPUT       //
+
+CHK_%,    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_%         //
+               	SZA                     //
+                BUN    	CHK_&           //
+                BUN    	ERR_INPUT       //
+
+CHK_&,    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_&         //
+               	SZA                     //
+                BUN    	CHK_(           //
+                BUN    	ERR_INPUT       //
+ 
+CHK_(,    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_(         //
+               	SZA                     //
+                BUN    	CHK_)           //
+                BUN    	ERR_INPUT       //
+
+CHK_),    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_)         //
+               	SZA                     //
+                BUN    	CHK_SNGLQT      //
+                BUN    	ERR_INPUT       //
+                
+CHK_SNGLQT,    	LDA    	TEMP_SYM     	//
+               	ADD     ASCII_'         //
+               	SZA                     //
+                BUN    	CHK_COMMA       //
+                BUN    	ERR_INPUT       //                              
+CHK_COMMA,    	LDA    	TEMP_SYM     	//
+               	ADD     ASCII_COMMA      //
+               	SZA                     //
+                BUN    	CHK_DOT         //
+                BUN    	ERR_INPUT       //
+
+CHK_DOT,    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_DOT       //
+               	SZA                     //
+                BUN    	CHK_SPACE	//
+        	BUN    	ERR_INPUT       //
+CHK_SPACE,    	LDA    	TEMP_SYM        //
+               	ADD     ASCII_SPACE     //
+               	SZA                     //
+                BUN    	CHK_END 	//
+        	BUN    	ERR_INPUT  	//                
+CHK_END,        BUN     CHK_SYMBOLS I   //
+
+//CHK_SYMBOLS DATA
+
+TEMP_SYM,   	DEC    	0
+ASCII_!,        HEX    	-21            	//
+ASCII_",        HEX    	-22            	//
+ASCII_#,        HEX    	-23            	//
+ASCII_$,        HEX    	-24            	//
+ASCII_%,        HEX    	-25            	//
+ASCII_&,        HEX    	-26            	//
+ASCII_',        HEX    	-27            	//
+ASCII_(,        HEX    	-28            	//
+ASCII_),        HEX    	-29            	//
+ASCII_DOT,     	HEX    	-2E            	//
+ASCII_COMMA,   	HEX    	-2C            	//
+ASCII_SPACE,	HEX     -20             //
+
+
+//**************** Function Multiply by 10 ****************
+// PURPOSE: for the conversion, Multiplay a number by 10 using bitwise manipulation
+// INPUT PARAMETERS: MUL10_TEMP
+// CALLED BY: ATOI
+
+
+MUL10,          HEX     0               //
+                CLE                     //
+                CIL                     // Circular left shift
+                STA     MUL10_TEMP      // Store in MUL10_TEMP
+                CIL                     // Circular left shift
+                CIL                     // Circular left shift
+                ADD     MUL10_TEMP      // Add MUL10_TEEMP
+                BUN     MUL10 I         // Return
+
+
+// MUL10 DATA
+MUL10_TEMP,     DEC     0               // Initialize MUL10_TEMP
+
+
+
+// **************** Function CHECK_MSB ****************
+// PURPOSE: Determines if there is an overflow or underflow based on the most significant bits (MSB) of operands.
+// GLOBAL PARAMETERS:
+// - PLUSONE
+// - XmsBit: MSB of the first operand 
+// - YmsBit: MSB of the second operand 
+// - Rmswit: MSB of the result of the operation 
+// - FLAG_RNG : Flag that increments if the result isn't in the range, and then checked in order to print the error
+// CALLS: Print (if an overflow or underflow is detected, a print routine is called)
+
+CHECK_MSB,      HEX    0                //
+                LDA     XmsBit          //
+                CMA                     //
+                INC                     //
+                ADD     YmsBit          //
+                SZA                     //  IF (XmsBit = YmsBit)
+                BUN     ELSE            //
+THEN,           LDA     XmsBit          //  THEN 
+                CMA                     //
+                INC                     //
+                ADD     Rmswit          //
+                SZA                     //      IF (XmsBit == YmsBit != Rmswit)
+                BUN     FLOW            //
+                BUN     ELSE            //
+FLOW,           LDA     XmsBit          //      THEN 
+                SZA                     //          IF (XmsBit == 0)
+                BUN     IS_UNDERFLOW    //  
+IS_OVERFLOW,    LDA     FLAG_RNG        //          if(rmswit == OVERFLOW || UNDERFLOW)
+                ADD     PLUSONE         //          THEN FLAG_RNG++;
+                STA     FLAG_RNG        //              return FLAG_RNG;
+                LDA     PtrERR_RANGE    // 
+                BUN     FI              //
+IS_UNDERFLOW,   LDA     FLAG_RNG        //
+                ADD     PLUSONE         //
+                STA     FLAG_RNG        //
+                LDA     PtrERR_RANGE    //
+                BUN     FI              //
+ELSE,           LDA     RESULT          // else
+                BUN     CHECK_MSB I     // return result
+FI,             BSA     PRINT           //
+                BUN     CHECK_MSB I     // return                                                
+
+
+// **************** Function FIND_MSB ****************
+// PURPOSE: Determines the sign of NUM1, NUM2 and RESULT
+// Global PARAMETERS: XmsBit, YmsBit, Rmswit, NUM1, NUM2, Result
+// INPUT PARAMETERS: int NUM1, int NUM2, int Result
+
+FIND_MSB,       HEX     0               //
+                LDA     NUM1            //
+                CIL                     // E = msb
+                CLA                     // AC = 0
+                CIL                     // AC lsb = E (either 1 or 0)
+                STA     XmsBit          //
+                LDA     NUM2            //
+                CIL                     //
+                CLA                     //
+                CIL                     //
+                STA     YmsBit          //
+                LDA     RESULT          //
+                CIL                     //
+                CLA                     //
+                CIL                     //
+                STA     Rmswit          //
+                LDA     Rmswit          //
+                BUN     FIND_MSB I      // return
+
+
+//FIND_MSB data
+XmsBit,         DEC     0               //
+YmsBit,         DEC     0               //
+Rmswit,         DEC     0               //
+
+
+// **************** Function int Print() ****************
+// PURPOSE: Print a string (puts)
+
+Print,          HEX     FD0             //
+                STA     pointer         // pointer = store_arr;
+WHILE_PRINT,    LDA     pointer I       // DO
+                SZA                     // if(pointer I == 0)
+                BUN     OUT_PTR         //  THEN
+                BUN     ENDLOOP         //      ENDLOOP
+OUT_PTR,        SKO                     //  ELSE
+                BUN     OUT_PTR         //      printf("%c",pointer[i])
+                OUT                     //
+                ISZ     pointer         //      if(pointer != 0)pointer++;
+                BUN     WHILE_PRINT     // WHILE_PRINT
+ENDLOOP,        BUN     Print I         // OD
+
+
+
+
+//**************** DATA ****************
+Pdigit_cap_st,  HEX     A00             //  gets rid of the zeroes for positive numbers
+                ORG     A00             //
+digit_cap_p,    DEC     10000           //
+                DEC     1000            //
+                DEC     100             //
+                DEC     10              //
+                DEC     1               //
+
+
+Ndigit_cap_st,  HEX     A60             //  gets rid of zeroes for negative number
+                ORG     A60             //
+digit_cap_n,    DEC     -10000          //
+                DEC     -1000           //
+                DEC     -100            //
+                DEC     -10             //
+
+//------------------------------------------MESSAGES STRINGS-------------------
+
+
+
+PtrERR_INPUT,   HEX     B33             // Err: Invalid Input!
+                ORG     B33             //
+ERR_INV_ARR,    HEX     A               //
+                HEX     20              //
+                HEX     45              //
+                HEX     72              //
+                HEX     72              //
+                HEX     3A              //
+                HEX     20              //
+                HEX     49              //
+                HEX     6E              //
+                HEX     76              //
+                HEX     61              //
+                HEX     6C              //
+                HEX     69              //
+                HEX     64              //
+                HEX     20              //
+                HEX     49              //
+                HEX     6E              //
+                HEX     70              //
+                HEX     75              //
+                HEX     74              //
+                HEX     21              //
+                HEX     0               //
+
+
+PtrERR_DIV,     HEX     B83             // Err: division by 0!
+                ORG     B83             //
+ERR_DIV_ARR,    HEX     A               //
+                HEX     20              //
+                HEX     45              //
+                HEX     72              //
+                HEX     72              //
+                HEX     3A              //
+                HEX     69              //
+                HEX     73              //
+                HEX     20              //
+                HEX     64              //
+                HEX     69              //
+                HEX     76              //
+                HEX     69              //
+                HEX     73              //
+                HEX     69              //
+                HEX     6F              //
+                HEX     6E              //
+                HEX     20              //
+                HEX     62              //
+                HEX     79              //
+                HEX     20              //
+                HEX     30              //
+                HEX     21              //
+                HEX     0               //
+
+
+REMAIND_START,  HEX     D05             // Rem:
+                ORG     D05             //
+REM_arr,        HEX     20              //
+                HEX     52              //
+                HEX     65              //
+                HEX     6D              //
+                HEX     0               //
+
+
+
+PtrOFF_START,   HEX     D35             // System OFF...
+                ORG     D35             //
+SYS_OFF_arr,    HEX     A               //
+                HEX     20              //
+                HEX     53              //
+                HEX     79              //
+                HEX     73              //
+                HEX     74              //
+                HEX     65              //
+                HEX     6D              //
+                HEX     20              //
+                HEX     4F              //
+                HEX     46              //
+                HEX     46              //
+                HEX     2E              //
+                HEX     2E              //
+                HEX     2E              //
+                HEX     20              //
+                HEX     0               //
+
+
+PROMPT_Arrow,   HEX     D90             // ->
+                ORG     D90             //
+Arrow_arr,      HEX     A               //          
+                HEX     20              //
+                HEX     2D              //
+                HEX     3E              //
+                HEX     20              //
+                HEX     0               //
+
+
+RESULT_launch,  HEX     F17             // =
+                ORG     F17             //
+RESULT_arr,     HEX     20              //
+                HEX     3D              //
+                HEX     20              //
+                HEX     0               //
+
+
+PtrERR_RANGE,   HEX     F90             // Err: Out of range!
+                ORG     F90             //
+ERR_RANGE_ARR,  HEX     A               //
+                HEX     20              //
+                HEX     4F              //
+                HEX     75              //
+                HEX     74              //
+                HEX     20              //
+                HEX     6F              //
+                HEX     66              //
+                HEX     20              //
+                HEX     72              //
+                HEX     61              //
+                HEX     6E              //
+                HEX     67              //
+                HEX     65              //
+                HEX     21              //  
+                HEX     0               //
+
+
+BOOT_MESSAGE, HEX     FA8               // End Input: (Enter) | Exit: (X or x) | Op: (+, -, *, /)
+                ORG     FA8             //
+MSG_ARR,        HEX     45              //
+                HEX     6E              //
+                HEX     64              //
+                HEX     20              //
+                HEX     49              //
+                HEX     6E              //
+                HEX     70              //
+                HEX     75              //
+                HEX     74              //
+                HEX     3A              //
+                HEX     20              //
+                HEX     28              //
+                HEX     45              //
+                HEX     6E              //
+                HEX     74              //
+                HEX     65              //
+                HEX     72              //
+                HEX     29              //
+                HEX     20              //
+                HEX     7C              //
+                HEX     20              //
+                HEX     45              //
+                HEX     78              //
+                HEX     69              //
+                HEX     74              //
+                HEX     3A              //
+                HEX     20              //
+                HEX     28              //
+                HEX     58              //
+                HEX     20              //
+                HEX     6F              //
+                HEX     72              //
+                HEX     20              //
+                HEX     78              //
+                HEX     29              //
+                HEX     20              //
+                HEX     7C              //
+                HEX     20              //
+                HEX     4F              //
+                HEX     70              //
+                HEX     3A              //
+                HEX     20              //
+                HEX     28              //
+                HEX     2B              //
+                HEX     2C              //
+                HEX     20              //
+                HEX     2D              //
+                HEX     2C              //
+                HEX     20              //
+                HEX     2A              //
+                HEX     2C              //
+                HEX     20              //
+                HEX     2F              //
+                HEX     29              //
+                HEX     0               //
+
+
+
+
+
+
+
+
+
+
