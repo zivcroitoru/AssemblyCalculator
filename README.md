@@ -1,4 +1,4 @@
-# 🧮 AssemblyCalculator
+# 🧮 Assembly Pocket Calculator
 
 Calculator programmed in Assembly Architecture
 **Computer Organization and Programming Course**
